@@ -5,9 +5,8 @@
 *
 * Related Document: See README.md
 *
-*
 *******************************************************************************
-* Copyright 2021-2023, Cypress Semiconductor Corporation (an Infineon company) or
+* Copyright 2023, Cypress Semiconductor Corporation (an Infineon company) or
 * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 *
 * This software, including source code, documentation and related
@@ -39,8 +38,12 @@
 * so agrees to indemnify Cypress against all liability.
 *******************************************************************************/
 
-/* Header file includes */
+/*******************************************************************************
+* Header Files
+*******************************************************************************/
 #include <stdio.h>
+#include <string.h>
+#include "cyhal.h"
 #include "cy_pdl.h"
 #include "cybsp.h"
 #include "cy_retarget_io.h"
@@ -48,57 +51,69 @@
 /*******************************************************************************
 * Macros
 *******************************************************************************/
+/* CAN-FD message identifier 1*/
 #define CANFD_NODE_1            1
+/* CAN-FD message identifier 2 (use different for 2nd device) */
 #define CANFD_NODE_2            2
+/* message Identifier used for this code */
 #define USE_CANFD_NODE          CANFD_NODE_1
-
+/* CAN-FD channel number used */
 #define CANFD_HW_CHANNEL        0
+/* CAN-FD data buffer index to send data from */
 #define CANFD_BUFFER_INDEX      0
-
+/* Maximum incoming data length supported */
 #define CANFD_DLC               8
 
-#ifdef COMPONENT_CAT1
 #define CANFD_INTERRUPT         canfd_0_interrupts0_0_IRQn
-#else
-#define CANFD_INTERRUPT         canfd_interrupts0_0_IRQn
-#endif
-    
-/*******************************************************************************
-* Function Prototypes
-*******************************************************************************/
 
-/* canfd interrupt handler */
-static void isr_canfd (void);
-
-/* button press interrupt handler */
-static void isr_button (void);
+#define GPIO_INTERRUPT_PRIORITY (7u)
 
 /*******************************************************************************
 * Global Variables
 *******************************************************************************/
-
-/* This is a shared context structure, unique for each canfd channel */
+/* This is a shared context structure, unique for each can-fd channel */
 static cy_stc_canfd_context_t canfd_context;
 
 /* Variable which holds the button pressed status */
-static volatile bool ButtonIntrFlag = false;
+volatile bool gpio_intr_flag = false;
 
-/* Array to store the data bytes of the CANFD frame */
-static uint32_t canfd_dataBuffer[] =
+cyhal_gpio_callback_data_t gpio_btn_callback_data;
+
+/* Populate the configuration structure for CAN-FD Interrupt */
+cy_stc_sysint_t canfd_irq_cfg =
 {
-    [CANFD_DATA_0] = 0x04030201U,
-    [CANFD_DATA_1] = 0x08070605U,
+    /* Source of interrupt signal */
+    .intrSrc = CANFD_INTERRUPT,
+    /* Interrupt priority */
+    .intrPriority = 1U,
 };
+
+/*******************************************************************************
+* Function Prototypes
+*******************************************************************************/
+
+/* can-fd interrupt handler */
+static void isr_canfd (void);
+
+/* button press interrupt handler */
+static void gpio_interrupt_handler(void *handler_arg, cyhal_gpio_event_t event);
+
+/* handler for general errors */
+void handle_error(uint32_t status);
+
+/*******************************************************************************
+* Function Definitions
+*******************************************************************************/
 
 /*******************************************************************************
 * Function Name: main
 ********************************************************************************
 * Summary:
-* This is the main function. It initializes the CANFD channel and interrupt.
-* User button and User LED are also initilalized. The main loop checks
-# for the button pressed interrupt flag and when it is set, a CANFD frame
-* is sent. Whenever a CANFD frame is received from other nodes, the user LED 
-* toggles and the received data is logged over serial terminal.
+* This is the main function. It initializes the CAN-FD channel and interrupt.
+* User button and User LED are also initialized. The main loop checks for the
+* button pressed interrupt flag and when it is set, a CAN-FD frame is sent.
+* Whenever a CAN-FD frame is received from other nodes, the user LED toggles and
+* the received data is logged over serial terminal.
 *
 * Parameters:
 *  none
@@ -112,138 +127,114 @@ int main(void)
     cy_rslt_t result;
 
     cy_en_canfd_status_t status;
-
+    /* Initialize the device and board peripherals */
     result = cybsp_init();
-
-    if (result != CY_RSLT_SUCCESS)
-    {
-        CY_ASSERT(0);
-    }
-
+    /* Board init failed. Stop program execution */
+    handle_error(result);
     /* Initialize retarget-io for uart logging */
-    result = cy_retarget_io_init(CYBSP_DEBUG_UART_TX, CYBSP_DEBUG_UART_RX, 
+    result = cy_retarget_io_init(CYBSP_DEBUG_UART_TX, CYBSP_DEBUG_UART_RX,
                                 CY_RETARGET_IO_BAUDRATE);
+    /* Retarget-io init failed. Stop program execution */
+    handle_error(result);
 
-    if (result != CY_RSLT_SUCCESS)
-    {
-        CY_ASSERT(0);
-    }
+    printf("===========================================================\r\n");
+    printf("Welcome to CAN-FD example\r\n");
+    printf("===========================================================\r\n\n");
 
-    printf("===============================================================\r\n");
-    printf("Welcome to CANFD example\r\n");
-    printf("===============================================================\r\n\n");
+    printf("===========================================================\r\n");
+    printf("CAN-FD Node-%d (message id)\r\n", USE_CANFD_NODE);
+    printf("===========================================================\r\n\n");
 
-    printf("===============================================================\r\n");
-    printf("CANFD Node-%d\r\n", USE_CANFD_NODE);
-    printf("===============================================================\r\n\n");
-
-    /* Populate the configuration structure for CANFD Interrupt */
-    cy_stc_sysint_t canfd_irq_cfg =
-    {   
-        /* Source of interrupt signal */
-        .intrSrc      = CANFD_INTERRUPT,
-        /* Interrupt priority */
-        .intrPriority = 1U,                      
-    };
-
-    /* Hook the interrupt service routine and enable the interrupt */
+    /* Hook the interrupt service routine */
     (void) Cy_SysInt_Init(&canfd_irq_cfg, &isr_canfd);
-
+    /* enable the CAN-FD interrupt */
     NVIC_EnableIRQ(CANFD_INTERRUPT);
 
-    cy_stc_sysint_t switch_intr_config = 
-    {
-        /* Source of interrupt signal */
-        .intrSrc = CYBSP_USER_BTN_IRQ, 
-        /* Interrupt priority */  
-        .intrPriority = 0U,                    
-    };
+    /* Initialize the user LED */
+    result = cyhal_gpio_init(CYBSP_USER_LED, CYHAL_GPIO_DIR_OUTPUT,
+                    CYHAL_GPIO_DRIVE_STRONG, CYBSP_LED_STATE_OFF);
+    /* User LED init failed. Stop program execution */
+    handle_error(result);
 
-    Cy_SysInt_Init(&switch_intr_config, isr_button);
+    /* Initialize the user button */
+    result = cyhal_gpio_init(CYBSP_USER_BTN, CYHAL_GPIO_DIR_INPUT,
+                    CYBSP_USER_BTN_DRIVE, CYBSP_BTN_OFF);
+    /* User button init failed. Stop program execution */
+    handle_error(result);
 
-    NVIC_EnableIRQ(CYBSP_USER_BTN_IRQ);
+    /* Configure GPIO interrupt */
+    gpio_btn_callback_data.callback = gpio_interrupt_handler;
+    cyhal_gpio_register_callback(CYBSP_USER_BTN,
+                                 &gpio_btn_callback_data);
+    cyhal_gpio_enable_event(CYBSP_USER_BTN, CYHAL_GPIO_IRQ_FALL,
+                                     GPIO_INTERRUPT_PRIORITY, true);
 
     /* Enable global interrupts */
     __enable_irq();
 
-    /* Initialze CANFD Channel */
-    status = Cy_CANFD_Init(CANFD_HW, CANFD_HW_CHANNEL, &CANFD_config, 
+    /* Initialize CAN-FD Channel */
+    status = Cy_CANFD_Init(CANFD_HW, CANFD_HW_CHANNEL, &CANFD_config,
                            &canfd_context);
 
-    if (status != CY_CANFD_SUCCESS)
-    {
-        CY_ASSERT(0);
-    }
+    handle_error(status);
 
-#if USE_CANFD_NODE == CANFD_NODE_1
-
-    /* Setting Node-1 Identifier as 0x01 */
+    /* Setting Node(message) Identifier to global setting of "USE_CANFD_NODE" */
     CANFD_T0RegisterBuffer_0.id = USE_CANFD_NODE;
-
-#elif USE_CANFD_NODE == CANFD_NODE_2
-
-    /* Setting Node-2 Identifier as 0x02 */
-    CANFD_T0RegisterBuffer_0.id = USE_CANFD_NODE;
-
-#endif
-
-    /* Assign the user defined data buffer to CANFD data area */
-    CANFD_txBuffer_0.data_area_f = canfd_dataBuffer;
 
     for(;;)
     {
-        
-        if (true == ButtonIntrFlag)
+        if (true == gpio_intr_flag)
         {
-            /* Sending CANFD frame to other node */
-            status = Cy_CANFD_UpdateAndTransmitMsgBuffer(CANFD_HW, 
-                                                    CANFD_HW_CHANNEL, 
+            /* Sending CAN-FD frame to other node */
+            status = Cy_CANFD_UpdateAndTransmitMsgBuffer(CANFD_HW,
+                                                    CANFD_HW_CHANNEL,
                                                     &CANFD_txBuffer_0,
-                                                    CANFD_BUFFER_INDEX, 
+                                                    CANFD_BUFFER_INDEX,
                                                     &canfd_context);
+            if(CY_CANFD_SUCCESS == status)
+            {
+                printf("CAN-FD Frame sent with message ID-%d\r\n\r\n",
+                        USE_CANFD_NODE);
+            }
+            else
+            {
+                printf("Error sending CAN-FD Frame with message ID-%d\r\n\r\n",
+                        USE_CANFD_NODE);
+            }
 
-            printf("CANFD Frame sent from Node-%d\r\n\r\n", USE_CANFD_NODE);
-
-            ButtonIntrFlag = false;
+            gpio_intr_flag = false;
         }
     }
 }
 
 /*******************************************************************************
-* Function Name: isr_button
+* Function Name: gpio_interrupt_handler
 ********************************************************************************
 * Summary:
-* This is the callback function for button press
+*   GPIO interrupt handler.
 *
 * Parameters:
-*    None
-*    
+*  void *handler_arg (unused)
+*  cyhal_gpio_event_t (unused)
+*
 *******************************************************************************/
-static void isr_button (void)
+static void gpio_interrupt_handler(void *handler_arg, cyhal_gpio_event_t event)
 {
-    /* Clears the triggered pin interrupt */
-    Cy_GPIO_ClearInterrupt(CYBSP_USER_BTN_PORT, CYBSP_USER_BTN_PIN);
-
-    NVIC_ClearPendingIRQ(CYBSP_USER_BTN_IRQ);
-
-    /* Set button interrupt flag */
-    ButtonIntrFlag = true;
+    gpio_intr_flag = true;
 }
 
 /*******************************************************************************
 * Function Name: isr_canfd
 ********************************************************************************
 * Summary:
-* This is the interrupt handler function for the canfd interrupt.
+* This is the interrupt handler function for the can-fd interrupt.
 *
 * Parameters:
 *  none
-*    
 *
 *******************************************************************************/
 static void isr_canfd(void)
 {
-
     /* Just call the IRQ handler with the current channel number and context */
     Cy_CANFD_IrqHandler(CANFD_HW, CANFD_HW_CHANNEL, &canfd_context);
 }
@@ -252,7 +243,7 @@ static void isr_canfd(void)
 * Function Name: canfd_rx_callback
 ********************************************************************************
 * Summary:
-* This is the callback function for canfd reception
+* This is the callback function for can-fd reception
 *
 * Parameters:
 *    msg_valid                     Message received properly or not
@@ -260,32 +251,29 @@ static void isr_canfd(void)
 *    canfd_rx_buf                  Message buffer
 *
 *******************************************************************************/
-void canfd_rx_callback (bool                        msg_valid, 
-                        uint8_t                     msg_buf_fifo_num,
-                        cy_stc_canfd_rx_buffer_t*   canfd_rx_buf)
+void canfd_rx_callback (bool  msg_valid, uint8_t msg_buf_fifo_num,
+                        cy_stc_canfd_rx_buffer_t* canfd_rx_buf)
 {
-
-    /* Array to hold the data bytes of the CANFD frame */
+    /* Array to hold the data bytes of the CAN-FD frame */
     uint8_t canfd_data_buffer[CANFD_DLC];
-    /* Variable to hold the data length code of the CANFD frame */
+    /* Variable to hold the data length code of the CAN-FD frame */
     uint32_t canfd_dlc;
-    /* Variable to hold the Identifier of the CANFD frame */
+    /* Variable to hold the Identifier of the CAN-FD frame */
     uint32_t canfd_id;
 
     if (true == msg_valid)
     {
         /* Checking whether the frame received is a data frame */
-        if(CY_CANFD_RTR_DATA_FRAME == canfd_rx_buf->r0_f->rtr) 
+        if(CY_CANFD_RTR_DATA_FRAME == canfd_rx_buf->r0_f->rtr)
         {
 
-            Cy_GPIO_Inv(CYBSP_USER_LED_PORT, CYBSP_USER_LED_PIN);
+            cyhal_gpio_toggle(CYBSP_USER_LED);
 
             canfd_dlc = canfd_rx_buf->r1_f->dlc;
             canfd_id  = canfd_rx_buf->r0_f->id;
 
-            printf("%d bytes received from Node-%d with identifier %d\r\n\r\n", 
+            printf("%d bytes received with message identifier %d\r\n\r\n",
                                                         (int)canfd_dlc,
-                                                        (int)canfd_id,
                                                         (int)canfd_id);
 
             memcpy(canfd_data_buffer,canfd_rx_buf->data_area_f,canfd_dlc);
@@ -296,11 +284,34 @@ void canfd_rx_callback (bool                        msg_valid,
             {
                 printf(" %d ", canfd_data_buffer[msg_idx]);
             }
-    
+
             printf("\r\n\r\n");
         }
     }
+}
 
+/*******************************************************************************
+* Function Name: handle_error
+********************************************************************************
+*
+* Summary:
+* User defined error handling function. This function processes unrecoverable
+* errors such as any initialization errors etc. In case of such error the system
+* will enter into assert.
+*
+* Parameters:
+*  uint32_t status - status indicates success or failure
+*
+* Return:
+*  void
+*
+*******************************************************************************/
+void handle_error(uint32_t status)
+{
+    if (status != CY_RSLT_SUCCESS)
+    {
+        CY_ASSERT(0);
+    }
 }
 
 /* [] END OF FILE */

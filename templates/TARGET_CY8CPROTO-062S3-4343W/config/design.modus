@@ -2049,18 +2049,6 @@
                     <Alias value="CYBSP_SW2"/>
                     <Alias value="CYBSP_USER_BTN1"/>
                     <Alias value="CYBSP_USER_BTN"/>
-                    <Personality template="pin" version="3.0">
-                        <Param id="DriveModes" value="CY_GPIO_DM_PULLUP"/>
-                        <Param id="initialState" value="1"/>
-                        <Param id="nonSec" value="1"/>
-                        <Param id="vtrip" value="CY_GPIO_VTRIP_CMOS"/>
-                        <Param id="isrTrigger" value="CY_GPIO_INTR_FALLING"/>
-                        <Param id="slewRate" value="CY_GPIO_SLEW_FAST"/>
-                        <Param id="driveStrength" value="CY_GPIO_DRIVE_1_2"/>
-                        <Param id="sioOutputBuffer" value="true"/>
-                        <Param id="pullUpRes" value="CY_GPIO_PULLUP_RES_DISABLE"/>
-                        <Param id="inFlash" value="true"/>
-                    </Personality>
                 </Block>
                 <Block location="ioss[0].port[0].pin[5]">
                     <Alias value="CYBSP_BT_HOST_WAKE"/>
@@ -2075,18 +2063,6 @@
                     <Alias value="CYBSP_LED4"/>
                     <Alias value="CYBSP_USER_LED1"/>
                     <Alias value="CYBSP_USER_LED"/>
-                    <Personality template="pin" version="3.0">
-                        <Param id="DriveModes" value="CY_GPIO_DM_STRONG_IN_OFF"/>
-                        <Param id="initialState" value="0"/>
-                        <Param id="nonSec" value="1"/>
-                        <Param id="vtrip" value="CY_GPIO_VTRIP_CMOS"/>
-                        <Param id="isrTrigger" value="CY_GPIO_INTR_DISABLE"/>
-                        <Param id="slewRate" value="CY_GPIO_SLEW_FAST"/>
-                        <Param id="driveStrength" value="CY_GPIO_DRIVE_1_2"/>
-                        <Param id="sioOutputBuffer" value="true"/>
-                        <Param id="pullUpRes" value="CY_GPIO_PULLUP_RES_DISABLE"/>
-                        <Param id="inFlash" value="true"/>
-                    </Personality>
                 </Block>
                 <Block location="ioss[0].port[11].pin[2]">
                     <Alias value="CYBSP_QSPI_SS"/>
