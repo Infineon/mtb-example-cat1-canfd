@@ -6,22 +6,23 @@ In this example, the CAN FD Node-1 sends a CAN FD frame to CAN FD-Node-2 on pres
 
 [View this README on GitHub.](https://github.com/Infineon/mtb-example-cat1-canfd)
 
-[Provide feedback on this code example.](https://cypress.co1.qualtrics.com/jfe/form/SV_1NTns53sK2yiljn?Q_EED=eyJVbmlxdWUgRG9jIElkIjoiQ0UyMzcxNTciLCJTcGVjIE51bWJlciI6IjAwMi0zNzE1NyIsIkRvYyBUaXRsZSI6IkNBTiBGRCIsInJpZCI6ImtoYXRyaW5hdmluayIsIkRvYyB2ZXJzaW9uIjoiMS4xLjAiLCJEb2MgTGFuZ3VhZ2UiOiJFbmdsaXNoIiwiRG9jIERpdmlzaW9uIjoiTUNEIiwiRG9jIEJVIjoiSUNXIiwiRG9jIEZhbWlseSI6IlBTT0MifQ==)
+[Provide feedback on this code example.](https://cypress.co1.qualtrics.com/jfe/form/SV_1NTns53sK2yiljn?Q_EED=eyJVbmlxdWUgRG9jIElkIjoiQ0UyMzcxNTciLCJTcGVjIE51bWJlciI6IjAwMi0zNzE1NyIsIkRvYyBUaXRsZSI6IkNBTiBGRCIsInJpZCI6ImtoYXRyaW5hdmluayIsIkRvYyB2ZXJzaW9uIjoiMS4yLjAiLCJEb2MgTGFuZ3VhZ2UiOiJFbmdsaXNoIiwiRG9jIERpdmlzaW9uIjoiTUNEIiwiRG9jIEJVIjoiSUNXIiwiRG9jIEZhbWlseSI6IlBTT0MifQ==)
 
 ## Requirements
 
 
-- [ModusToolbox&trade;](https://www.infineon.com/modustoolbox) v3.0 or later (tested with v3.0)
+- [ModusToolbox&trade;](https://www.infineon.com/modustoolbox) v3.2 or later (tested with v3.2)
 - Board support package (BSP) minimum required version for:
    - PSoC&trade; 6 MCU: 4.0.0
    - CYW920829M2EVK-02: v1.0.1
-   - CYW989829M2EVB-01: v1.0.1
+   - CYW989829M2EVB-01: v1.0.4
+   - CYW989829M2EVB-03: v1.0.4
 - Programming language: C
 - Associated parts: [PSoC&trade; 62](https://www.infineon.com/cms/en/product/microcontroller/32-bit-psoc-arm-cortex-microcontroller/psoc-6-32-bit-arm-cortex-m4-mcu/psoc-62), [AIROC&trade; CYW20829 Bluetooth&reg; LE SoC](https://www.infineon.com/cms/en/product/promopages/airoc20829) and [AIROC&trade; CYW89829 Bluetooth&reg; LE SoC]() MCU parts with CAN FD feature.
 
 ## Supported toolchains (make variable 'TOOLCHAIN')
 
-- GNU Arm&reg; Embedded Compiler v10.3.1 (`GCC_ARM`) - Default value of `TOOLCHAIN`
+- GNU Arm&reg; Embedded Compiler v11.3.1 (`GCC_ARM`) – Default value of `TOOLCHAIN`
 - Arm&reg; Compiler v6.16 (`ARM`)
 - IAR C/C++ Compiler v9.30.1 (`IAR`)
 
@@ -29,7 +30,7 @@ In this example, the CAN FD Node-1 sends a CAN FD frame to CAN FD-Node-2 on pres
 
 - [PSoC&trade; 62S3 Wi-Fi Bluetooth&reg; prototyping kit](https://www.infineon.com/CY8CPROTO-062S3-4343W) (`CY8CPROTO-062S3-4343W`) – Default value of `TARGET`
 - [AIROC&trade; CYW20829 Bluetooth&reg; LE evaluation Kit](https://www.infineon.com/CYW920829M2EVK-02) (`CYW920829M2EVK-02`)
-- [AIROC&trade; CYW89829 Bluetooth&reg; LE evaluation kit]() (`CYW989829M2EVB-01`)
+- AIROC&trade; CYW89829 Bluetooth&reg; LE Evaluation kit (`CYW989829M2EVB-01`, `CYW989829M2EVB-03`)
 - [PSoC&trade; 62S4 pioneer kit](https://www.infineon.com/CY8CKIT-062S4) (`CY8CKIT-062S4`)
 
 
@@ -38,6 +39,8 @@ In this example, the CAN FD Node-1 sends a CAN FD frame to CAN FD-Node-2 on pres
 This example uses the board's default configuration for CY8CPROTO-062S3-4343W. See the kit user guide and schematic to ensure that the board is configured correctly.
 
 **Note:** The AIROC&trade; CYW89829 Bluetooth&reg; kit (CYW989829M2EVB-01) requires rework on the board to work with CAN. CAN RX/TX use P3.2 and P3.3 which was used for UART and connecting to J12 in default. To use UART, UART can map to P1.2(ARD_D5_SWDIO) and P1.3(ARD_D4_SWDCLK), Need remove jump on J12 5&6 and J12 7&8, connect J6.4(ARD_D5_SWDIO) to J12.5 and J6.3(ARD_D4_SWDCLK) to J12.7. Since P1.2 and P1.3 worked for UART, SWD for debug is not possible.
+
+**Note:** The AIROC&trade; CYW89829 Bluetooth&reg; kit (CYW989829M2EVB-03) requires rework on the board to work with CAN. Move R4 from D-A to D-C on the red board((CYW989829Q40M2IPA1)).  
 
 **Note:** The AIROC&trade; CYW20829 Bluetooth&reg; kit (CYW920829M2EVK-02) ships with KitProg3 version 2.21 installed. The ModusToolbox&trade; software requires KitProg3 with latest version 2.40. Before using this code example, make sure that the board is upgraded to KitProg3. The tool and instructions are available in the [Firmware Loader](https://github.com/Infineon/Firmware-loader) GitHub repository. If you do not upgrade, you will see an error such as "unable to find CMSIS-DAP device" or "KitProg firmware is out of date".
 
@@ -72,6 +75,7 @@ See Table 1 for pin assignments for NODE-1 and NODE-2 for supported kits.
 Kit | CAN_RX | CAN_TX | Ground | Power to CAN2 transceiver
 ---|---|---|--|----
 CYW989829M2EVB-01 | 3[2]/J12[6] | 3[3]/J12[8] | GND | J117[1] (VCC.3.3V)
+CYW989829M2EVB-03 | 5[0] | 5[1] | GND | J1[4] (VCC.5V)
 CYW920829M2EVK-02 | 5[0] | 5[1] | GND | J1[4] (VCC.5V)
 CY8CPROTO-062S3-4343W | 5[0] | 5[1] | GND | J9[1] (VCC.5V)
 CY8CKIT-062S4 | 5[0] | 5[1] | GND | J1[4] (V5.0)
@@ -306,6 +310,7 @@ Document title: *CE237157* - *CAN FD*
  ------- | ---------------------
  1.0.0   | New code example
  1.1.0   | Added support for CYW920829M2EVK-02 and CYW989829M2EVB-01
+ 1.2.0   | Added support for CYW989829M2EVB-03,Updated MPN CYW89829B01MKSBG to CYW89829B0232 in CYW989829M2EVB-01 templates
 <br>
 
 All referenced product or service names and trademarks are the property of their respective owners.
